@@ -2,6 +2,9 @@ import boto3, json, argparse
 from get_public_ip import get_public_ip
 
 def update_ip_address(client, domain, ip):
+    
+    dns_records = []
+    hosted_zone_id = ''
     response = client.list_hosted_zones_by_name(
     DNSName=domain, 
     MaxItems='1'
@@ -14,36 +17,40 @@ def update_ip_address(client, domain, ip):
         print('HostedZone {} found with Id {}'.format(domain, hosted_zone_id))
     else:
         print('HostedZone not found: {}'.format(domain))
+    
+    dns_in_iteration = client.list_resource_record_sets(HostedZoneId=hosted_zone_id)
+    dns_records.extend(dns_in_iteration['ResourceRecordSets'])
 
-
-    response = client.change_resource_record_sets(
-        HostedZoneId=hosted_zone_id,
-        ChangeBatch={
-            "Comment": "Automatic DNS update",
-            "Changes": [
-                {
-                    "Action": "UPSERT",
-                    "ResourceRecordSet": {
-                        "Name": domain,
-                        "Type": "A",
-                        "TTL": 180,
-                        "ResourceRecords": [
-                            {
-                                "Value": ip
-                            },
-                        ],
-                    }
-                },
-            ]
-        }
-    )    
+    for record in dns_records:
+        if record["Type"] == "A":
+            response = client.change_resource_record_sets(
+                HostedZoneId=hosted_zone_id,
+                ChangeBatch={
+                    "Comment": "Automatic DNS update",
+                    "Changes": [
+                        {
+                            "Action": "UPSERT",
+                            "ResourceRecordSet": {
+                                "Name": record["Name"],
+                                "Type": "A",
+                                "TTL": 180,
+                                "ResourceRecords": [
+                                    {
+                                        "Value": ip
+                                    },
+                                ],
+                            }
+                        },
+                    ]
+                }
+            )    
 
 
 def main():
-    parser = argparse.ArgumentParser(description='A python script used to update the IP of the hosted zone')
-    parser.add_argument('-d','--domain', help='The domains IP to check to ensure IP resolves properly for certbot', required=True)
+    parser = argparse.ArgumentParser(description='A python script used to update the IP of the hosted zone: python3 update_r53_ip.py -d example.com')
+    parser.add_argument('-d','--domain', help='The domain IP to check to ensure IP resolves properly for certbot', required=True)
     args = vars(parser.parse_args())
-    session = boto3.session.Session()
+    session = boto3.session.Session(profile_name='netrunner')
 
     client = session.client('route53')
     domain = args['domain']
