@@ -50,7 +50,7 @@ def main():
     parser = argparse.ArgumentParser(description='A python script used to update the IP of the hosted zone: python3 update_r53_ip.py -d example.com')
     parser.add_argument('-d','--domain', help='The domain IP to check to ensure IP resolves properly for certbot', required=True)
     args = vars(parser.parse_args())
-    session = boto3.session.Session(profile_name='netrunner')
+    session = boto3.session.Session()
 
     client = session.client('route53')
     domain = args['domain']
